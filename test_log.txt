@@ -1,0 +1,25 @@
+--- RESIZE TEST START ---
+Connecting to existing OpenRGB server on 6742...
+Connected successfully!
+Controller count: 1
+Device 0: ASUS PRIME Z790-P WIFI
+Current active mode: Direct
+Set mode to Direct
+Current Zones:
+- Zone 0 (Aura Mainboard): 2 LEDs (resizable: false)
+- Zone 1 (Aura Addressable 1): 0 LEDs (resizable: true)
+- Zone 2 (Aura Addressable 2): 0 LEDs (resizable: true)
+- Zone 3 (Aura Addressable 3): 0 LEDs (resizable: true)
+Resizing Zone 1 (Aura Addressable 1) to 80 LEDs...
+Resizing Zone 2 (Aura Addressable 2) to 80 LEDs...
+Resizing Zone 3 (Aura Addressable 3) to 80 LEDs...
+Zones after resizing:
+- Zone 0 (Aura Mainboard): 2 LEDs
+- Zone 1 (Aura Addressable 1): 80 LEDs
+- Zone 2 (Aura Addressable 2): 80 LEDs
+- Zone 3 (Aura Addressable 3): 80 LEDs
+Total LEDs on device now: 242
+Updating all LEDs to Red...
+LEDs updated successfully!
+Disconnecting...
+--- RESIZE TEST END ---
