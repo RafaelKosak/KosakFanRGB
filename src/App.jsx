@@ -1,175 +1,183 @@
-import { useState, useEffect, useCallback } from 'react'
-import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync } from 'react-icons/fa'
-import { HexColorPicker } from 'react-colorful'
-import './index.css'
+import { useState, useEffect, useCallback } from 'react';
+import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync } from 'react-icons/fa';
+import { HexColorPicker } from 'react-colorful';
+import './index.css';
 
 const PRESET_COLORS = [
   '#ff0000', '#ff8800', '#ffff00', '#00ff00', '#00ffff',
   '#0000ff', '#8800ff', '#ff00ff', '#ffffff', '#000000'
-]
+];
 
 function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
     red: parseInt(result[1], 16),
     green: parseInt(result[2], 16),
     blue: parseInt(result[3], 16)
-  } : { red: 0, green: 0, blue: 0 }
+  } : { red: 0, green: 0, blue: 0 };
 }
 
 function App() {
-  const [devices, setDevices] = useState([])
-  const [activeDevice, setActiveDevice] = useState(null)
-  const [color, setColor] = useState('#aa3bff')
-  const [brightness, setBrightness] = useState(100)
-  const [status, setStatus] = useState('starting')
-  const [error, setError] = useState('')
-  const [startWithWindows, setStartWithWindows] = useState(false)
-  const [startHidden, setStartHidden] = useState(false)
+  const [devices, setDevices] = useState([]);
+  const [activeDevice, setActiveDevice] = useState(null);
+  const [color, setColor] = useState('#aa3bff');
+  const [brightness, setBrightness] = useState(100);
+  const [status, setStatus] = useState('starting');
+  const [error, setError] = useState('');
+  const [startWithWindows, setStartWithWindows] = useState(false);
+  const [startHidden, setStartHidden] = useState(false);
 
+  // Load saved settings on mount
   useEffect(() => {
     const loadSavedSettings = async () => {
-      if (window.electronAPI?.getSettings) {
-        const saved = await window.electronAPI.getSettings()
+      if (window.electronAPI && window.electronAPI.getSettings) {
+        const saved = await window.electronAPI.getSettings();
         if (saved) {
-          if (saved.color) setColor(saved.color)
-          if (saved.brightness !== undefined) setBrightness(saved.brightness)
-          if (saved.startWithWindows !== undefined) setStartWithWindows(saved.startWithWindows)
-          if (saved.startHidden !== undefined) setStartHidden(saved.startHidden)
+          if (saved.color) setColor(saved.color);
+          if (saved.brightness !== undefined) setBrightness(saved.brightness);
+          if (saved.startWithWindows !== undefined) setStartWithWindows(saved.startWithWindows);
+          if (saved.startHidden !== undefined) setStartHidden(saved.startHidden);
         }
       }
-    }
-    loadSavedSettings()
-  }, [])
+    };
+    loadSavedSettings();
+  }, []);
 
   const handleToggleStartWithWindows = async (e) => {
-    const val = e.target.checked
-    setStartWithWindows(val)
-    if (window.electronAPI?.saveSettings) {
+    const val = e.target.checked;
+    setStartWithWindows(val);
+    if (window.electronAPI && window.electronAPI.saveSettings) {
       await window.electronAPI.saveSettings({
         color,
         brightness,
         startWithWindows: val,
         startHidden
-      })
+      });
     }
-  }
+  };
 
   const handleToggleStartHidden = async (e) => {
-    const val = e.target.checked
-    setStartHidden(val)
-    if (window.electronAPI?.saveSettings) {
+    const val = e.target.checked;
+    setStartHidden(val);
+    if (window.electronAPI && window.electronAPI.saveSettings) {
       await window.electronAPI.saveSettings({
         color,
         brightness,
         startWithWindows,
         startHidden: val
-      })
+      });
     }
-  }
+  };
 
   const fetchDevices = useCallback(async () => {
     if (!window.electronAPI) {
-      setStatus('error')
-      setError('Electron API não disponível')
-      return
+      setStatus('error');
+      setError('Electron API não disponível');
+      return;
     }
 
-    setStatus('scanning')
-    setError('')
+    setStatus('scanning');
+    setError('');
 
-    const result = await window.electronAPI.getDevices()
+    const result = await window.electronAPI.getDevices();
 
     if (result && result.error) {
-      setStatus('error')
-      setError(result.error)
+      setStatus('error');
+      setError(result.error);
     } else if (Array.isArray(result)) {
-      setDevices(result)
+      setDevices(result);
       if (result.length > 0) {
-        setActiveDevice(result[0])
-        setStatus('connected')
+        setActiveDevice(result[0]);
+        setStatus('connected');
       } else {
-        setStatus('error')
-        setError('Nenhum dispositivo RGB detectado.\nVerifique se seus fans/placas possuem LEDs RGB.')
+        setStatus('error');
+        setError('Nenhum dispositivo RGB detectado.\nVerifique se seus fans/placas possuem LEDs RGB.');
       }
     }
-  }, [])
+  }, []);
 
+  // On mount: wait a bit for the backend to connect, then fetch
   useEffect(() => {
-    let cancelled = false
-    let attempt = 0
+    let cancelled = false;
+    let attempt = 0;
 
     const tryFetch = async () => {
       while (!cancelled && attempt < 10) {
-        attempt++
+        attempt++;
+        console.log(`[UI] Fetch attempt ${attempt}...`);
 
         if (window.electronAPI) {
-          const result = await window.electronAPI.getDevices()
-          if (cancelled) return
+          const result = await window.electronAPI.getDevices();
+
+          if (cancelled) return;
 
           if (result && result.error) {
-            await new Promise(r => setTimeout(r, 2000))
-            continue
+            console.log(`[UI] Attempt ${attempt} error:`, result.error);
+            // Wait 2 seconds and retry
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
           }
 
           if (Array.isArray(result) && result.length > 0) {
-            setDevices(result)
-            setActiveDevice(result[0])
-            setStatus('connected')
-            return
+            setDevices(result);
+            setActiveDevice(result[0]);
+            setStatus('connected');
+            return;
           }
 
           if (Array.isArray(result) && result.length === 0) {
-            setStatus('error')
-            setError('Nenhum dispositivo RGB detectado.')
-            return
+            setStatus('error');
+            setError('Nenhum dispositivo RGB detectado.');
+            return;
           }
         }
-        await new Promise(r => setTimeout(r, 2000))
+
+        await new Promise(r => setTimeout(r, 2000));
       }
 
       if (!cancelled) {
-        setStatus('error')
-        setError('Não foi possível conectar ao motor de hardware após várias tentativas.\nTente executar como Administrador.')
+        setStatus('error');
+        setError('Não foi possível conectar ao motor de hardware após várias tentativas.\nTente executar como Administrador.');
       }
-    }
+    };
 
+    // Give the backend 3 seconds head start to connect
     const timer = setTimeout(() => {
-      setStatus('scanning')
-      tryFetch()
-    }, 3000)
+      setStatus('scanning');
+      tryFetch();
+    }, 3000);
 
     return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [])
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleRetry = async () => {
-    setStatus('scanning')
-    setError('')
-    if (window.electronAPI?.retryConnection) {
-      await window.electronAPI.retryConnection()
+    setStatus('scanning');
+    setError('');
+    if (window.electronAPI && window.electronAPI.retryConnection) {
+      await window.electronAPI.retryConnection();
     }
-    await fetchDevices()
-  }
+    await fetchDevices();
+  };
 
   const applyColors = async () => {
-    if (!activeDevice || !window.electronAPI) return
+    if (!activeDevice || !window.electronAPI) return;
 
-    const baseRgb = hexToRgb(color)
+    const baseRgb = hexToRgb(color);
     const finalRgb = {
       red: Math.floor(baseRgb.red * (brightness / 100)),
       green: Math.floor(baseRgb.green * (brightness / 100)),
       blue: Math.floor(baseRgb.blue * (brightness / 100)),
-    }
+    };
 
-    const ledCount = activeDevice.colors.length
-    const colorArray = new Array(ledCount).fill(finalRgb)
+    const ledCount = activeDevice.colors.length;
+    const colorArray = new Array(ledCount).fill(finalRgb);
 
-    const result = await window.electronAPI.updateLeds(activeDevice.index, colorArray)
+    const result = await window.electronAPI.updateLeds(activeDevice.index, colorArray);
     if (result.error) {
-      alert('Erro ao aplicar cores: ' + result.error)
+      alert('Erro ao aplicar cores: ' + result.error);
     } else {
       if (window.electronAPI.saveSettings) {
         await window.electronAPI.saveSettings({
@@ -177,19 +185,19 @@ function App() {
           brightness,
           startWithWindows,
           startHidden
-        })
+        });
       }
     }
-  }
+  };
 
   const getDeviceIcon = (type) => {
-    if (!type) return <FaQuestion />
-    const t = String(type).toLowerCase()
-    if (t.includes('fan') || t.includes('cooler')) return <FaFan />
-    if (t.includes('motherboard') || t.includes('mainboard')) return <FaMicrochip />
-    if (t.includes('dram') || t.includes('memory')) return <FaMemory />
-    return <FaMicrochip />
-  }
+    if (!type) return <FaQuestion />;
+    const t = String(type).toLowerCase();
+    if (t.includes('fan') || t.includes('cooler')) return <FaFan />;
+    if (t.includes('motherboard') || t.includes('mainboard')) return <FaMicrochip />;
+    if (t.includes('dram') || t.includes('memory')) return <FaMemory />;
+    return <FaMicrochip />;
+  };
 
   const renderStatusText = () => {
     switch (status) {
@@ -199,14 +207,14 @@ function App() {
             <div className="spinner"></div>
             <p>Iniciando motor de hardware...</p>
           </div>
-        )
+        );
       case 'scanning':
         return (
           <div className="status-msg">
             <div className="spinner"></div>
             <p>Procurando dispositivos RGB...</p>
           </div>
-        )
+        );
       case 'error':
         return (
           <div className="status-msg error">
@@ -215,11 +223,11 @@ function App() {
               <FaSync /> Tentar Novamente
             </button>
           </div>
-        )
+        );
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   return (
     <>
@@ -328,7 +336,7 @@ function App() {
         </div>
       </div>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
