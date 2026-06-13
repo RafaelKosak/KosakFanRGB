@@ -39,6 +39,7 @@ function App() {
   const [effectSpeed, setEffectSpeed] = useState(50);
   const [effectDirection, setEffectDirection] = useState(0);
   const [effectSmoothness, setEffectSmoothness] = useState(50);
+  const [version, setVersion] = useState('');
 
   // Profiles system states
   const [profiles, setProfiles] = useState([
@@ -57,6 +58,14 @@ function App() {
 
   useEffect(() => {
     const load = async () => {
+      if (window.electronAPI?.getAppVersion) {
+        try {
+          const v = await window.electronAPI.getAppVersion();
+          setVersion(v);
+        } catch (e) {
+          console.error(e);
+        }
+      }
       if (!window.electronAPI?.getSettings) return;
       const s = await window.electronAPI.getSettings();
       if (!s) return;
@@ -432,6 +441,9 @@ function App() {
             </div>
             {status === 'connected' && (
               <button className="btn-small" onClick={handleRetry}><FaSync size={9} /> Atualizar</button>
+            )}
+            {version && (
+              <div className="app-version">v{version}</div>
             )}
           </div>
         </div>

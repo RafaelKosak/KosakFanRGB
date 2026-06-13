@@ -473,8 +473,20 @@ const createWindow = () => {
   const shouldStartHidden = process.argv.includes('--hidden');
   mainWindow.once('ready-to-show', () => { if (!shouldStartHidden) mainWindow.show(); });
 
+  const htmlPath = path.join(__dirname, '../dist/index.html');
+  try {
+    fs.writeFileSync(
+      'c:\\Users\\kosak\\Desktop\\Development\\Kosak Fan\\debug-load.log',
+      `__dirname: ${__dirname}\nhtmlPath: ${htmlPath}\nexists: ${fs.existsSync(htmlPath)}\n`
+    );
+  } catch (e) {}
+
   if (process.env.VITE_DEV_SERVER_URL) mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-  else mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  else mainWindow.loadFile(htmlPath);
+
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
 
   mainWindow.on('close', (event) => {
     if (!isQuitting) { event.preventDefault(); mainWindow.hide(); }
@@ -490,6 +502,17 @@ app.on('quit', () => {
 });
 
 // ── IPC Handlers ──
+
+ipcMain.handle('get-app-version', () => {
+  const ver = app.getVersion();
+  try {
+    fs.appendFileSync(
+      'c:\\Users\\kosak\\Desktop\\Development\\Kosak Fan\\debug-load.log',
+      `IPC get-app-version called. Returning: "${ver}"\n`
+    );
+  } catch (err) {}
+  return ver;
+});
 
 ipcMain.handle('get-settings', () => loadSettings());
 

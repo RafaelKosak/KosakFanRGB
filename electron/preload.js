@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getDevices: () => ipcRenderer.invoke('get-devices'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   updateLeds: (deviceId, colors) => ipcRenderer.invoke('update-leds', deviceId, colors),
   retryConnection: () => ipcRenderer.invoke('retry-connection'),
   getSettings: () => ipcRenderer.invoke('get-settings'),
