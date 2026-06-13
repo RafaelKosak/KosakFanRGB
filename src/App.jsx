@@ -27,10 +27,9 @@ function App() {
   const [startWithWindows, setStartWithWindows] = useState(false);
   const [startHidden, setStartHidden] = useState(false);
 
-  // Load saved settings on mount
   useEffect(() => {
     const loadSavedSettings = async () => {
-      if (window.electronAPI && window.electronAPI.getSettings) {
+      if (window.electronAPI?.getSettings) {
         const saved = await window.electronAPI.getSettings();
         if (saved) {
           if (saved.color) setColor(saved.color);
@@ -46,7 +45,7 @@ function App() {
   const handleToggleStartWithWindows = async (e) => {
     const val = e.target.checked;
     setStartWithWindows(val);
-    if (window.electronAPI && window.electronAPI.saveSettings) {
+    if (window.electronAPI?.saveSettings) {
       await window.electronAPI.saveSettings({
         color,
         brightness,
@@ -59,7 +58,7 @@ function App() {
   const handleToggleStartHidden = async (e) => {
     const val = e.target.checked;
     setStartHidden(val);
-    if (window.electronAPI && window.electronAPI.saveSettings) {
+    if (window.electronAPI?.saveSettings) {
       await window.electronAPI.saveSettings({
         color,
         brightness,
@@ -80,7 +79,6 @@ function App() {
     setError('');
 
     const result = await window.electronAPI.getDevices();
-
     if (result && result.error) {
       setStatus('error');
       setError(result.error);
@@ -96,7 +94,6 @@ function App() {
     }
   }, []);
 
-  // On mount: wait a bit for the backend to connect, then fetch
   useEffect(() => {
     let cancelled = false;
     let attempt = 0;
@@ -104,16 +101,11 @@ function App() {
     const tryFetch = async () => {
       while (!cancelled && attempt < 10) {
         attempt++;
-        console.log(`[UI] Fetch attempt ${attempt}...`);
-
         if (window.electronAPI) {
           const result = await window.electronAPI.getDevices();
-
           if (cancelled) return;
 
           if (result && result.error) {
-            console.log(`[UI] Attempt ${attempt} error:`, result.error);
-            // Wait 2 seconds and retry
             await new Promise(r => setTimeout(r, 2000));
             continue;
           }
@@ -131,7 +123,6 @@ function App() {
             return;
           }
         }
-
         await new Promise(r => setTimeout(r, 2000));
       }
 
@@ -141,7 +132,6 @@ function App() {
       }
     };
 
-    // Give the backend 3 seconds head start to connect
     const timer = setTimeout(() => {
       setStatus('scanning');
       tryFetch();
@@ -156,7 +146,7 @@ function App() {
   const handleRetry = async () => {
     setStatus('scanning');
     setError('');
-    if (window.electronAPI && window.electronAPI.retryConnection) {
+    if (window.electronAPI?.retryConnection) {
       await window.electronAPI.retryConnection();
     }
     await fetchDevices();
