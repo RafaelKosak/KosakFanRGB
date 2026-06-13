@@ -79,6 +79,9 @@ const loadSettings = () => {
         ];
         settings.activeProfileId = 'default';
       }
+      if (!settings.theme) {
+        settings.theme = 'dark';
+      }
       return settings;
     }
   } catch (e) {
@@ -485,7 +488,9 @@ const createWindow = () => {
   if (process.env.VITE_DEV_SERVER_URL) mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   else mainWindow.loadFile(htmlPath);
 
-  mainWindow.webContents.openDevTools();
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
 
   mainWindow.on('close', (event) => {
     if (!isQuitting) { event.preventDefault(); mainWindow.hide(); }

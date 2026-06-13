@@ -121,10 +121,10 @@ function App() {
     });
 
     await window.electronAPI.saveSettings({
-      startWithWindows,
-      startHidden,
-      favoriteColors,
-      theme,
+      startWithWindows: overrides.startWithWindows !== undefined ? overrides.startWithWindows : startWithWindows,
+      startHidden: overrides.startHidden !== undefined ? overrides.startHidden : startHidden,
+      favoriteColors: overrides.favoriteColors !== undefined ? overrides.favoriteColors : favoriteColors,
+      theme: overrides.theme !== undefined ? overrides.theme : theme,
       profiles: updatedProfiles,
       activeProfileId: currentActiveId,
       // For backwards compatibility
