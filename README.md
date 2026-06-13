@@ -2,6 +2,11 @@
 
 Aplicativo desktop desenvolvido em React e Electron para controle e gerenciamento de dispositivos ARGB (coolers, memórias RAM e placas-mãe) utilizando a biblioteca OpenRGB.
 
+> [!NOTE]
+> Este é um projeto para **uso pessoal**, distribuído para pessoas que procuram uma opção simples e leve para controlar a cor das ventoinhas (fans). O projeto está em fase **beta e desenvolvimento inicial**.
+> 
+> **Planejamento Futuro:** Está prevista a adição de funcionalidades para controle e configuração de **curva de velocidade das ventoinhas**.
+
 O projeto visa fornecer uma alternativa leve e direta aos softwares proprietários de fabricantes, comunicando-se com o hardware através de uma instância local embutida do OpenRGB SDK.
 
 ## Funcionalidades
