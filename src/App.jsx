@@ -1,7 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync, FaStar, FaRegStar, FaSun, FaMoon } from 'react-icons/fa';
+import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync, FaStar, FaRegStar, FaSun, FaMoon, FaClone, FaTrash, FaDownload, FaUpload } from 'react-icons/fa';
 import { HexColorPicker } from 'react-colorful';
 import './index.css';
+
+const EFFECTS = [
+  { id: 'static',     label: 'Estático' },
+  { id: 'breathing',  label: 'Respiração' },
+  { id: 'rainbow',    label: 'Rainbow' },
+  { id: 'wave',       label: 'Onda' },
+  { id: 'pulse',      label: 'Pulso' },
+  { id: 'gradient',   label: 'Gradiente' },
+  { id: 'blink',      label: 'Piscar' },
+  { id: 'colorcycle', label: 'Ciclo de Cores' },
+  { id: 'off',        label: 'Desligado' },
+];
+
+const ANIMATED_EFFECTS = ['breathing', 'rainbow', 'wave', 'pulse', 'blink', 'colorcycle'];
 
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -21,14 +35,48 @@ function App() {
   const [startHidden, setStartHidden] = useState(false);
   const [favoriteColors, setFavoriteColors] = useState([]);
   const [theme, setTheme] = useState('dark');
+  const [effect, setEffect] = useState('static');
+  const [effectSpeed, setEffectSpeed] = useState(50);
+  const [effectDirection, setEffectDirection] = useState(0);
+  const [effectSmoothness, setEffectSmoothness] = useState(50);
+
+  // Profiles system states
+  const [profiles, setProfiles] = useState([
+    {
+      id: 'default',
+      name: 'Padrão',
+      color: '#aa3bff',
+      brightness: 100,
+      effect: 'static',
+      effectSpeed: 50,
+      effectDirection: 0,
+      effectSmoothness: 50
+    }
+  ]);
+  const [activeProfileId, setActiveProfileId] = useState('default');
 
   useEffect(() => {
     const load = async () => {
       if (!window.electronAPI?.getSettings) return;
       const s = await window.electronAPI.getSettings();
       if (!s) return;
-      if (s.color) setColor(s.color);
-      if (s.brightness !== undefined) setBrightness(s.brightness);
+      
+      if (Array.isArray(s.profiles)) {
+        setProfiles(s.profiles);
+      }
+      if (s.activeProfileId) {
+        setActiveProfileId(s.activeProfileId);
+      }
+
+      // Load active profile configs
+      const active = s.profiles?.find(p => p.id === s.activeProfileId) || s.profiles?.[0] || s;
+      if (active.color) setColor(active.color);
+      if (active.brightness !== undefined) setBrightness(active.brightness);
+      if (active.effect) setEffect(active.effect);
+      if (active.effectSpeed !== undefined) setEffectSpeed(active.effectSpeed);
+      if (active.effectDirection !== undefined) setEffectDirection(active.effectDirection);
+      if (active.effectSmoothness !== undefined) setEffectSmoothness(active.effectSmoothness);
+
       if (s.startWithWindows !== undefined) setStartWithWindows(s.startWithWindows);
       if (s.startHidden !== undefined) setStartHidden(s.startHidden);
       if (Array.isArray(s.favoriteColors)) setFavoriteColors(s.favoriteColors);
@@ -43,11 +91,42 @@ function App() {
 
   const save = useCallback(async (overrides = {}) => {
     if (!window.electronAPI?.saveSettings) return;
-    await window.electronAPI.saveSettings({
-      color, brightness, startWithWindows, startHidden, favoriteColors, theme,
-      ...overrides
+
+    let updatedProfiles = overrides.profiles !== undefined ? overrides.profiles : profiles;
+    const currentActiveId = overrides.activeProfileId !== undefined ? overrides.activeProfileId : activeProfileId;
+
+    // Update active profile values in profiles list
+    updatedProfiles = updatedProfiles.map(p => {
+      if (p.id === currentActiveId) {
+        return {
+          ...p,
+          color: overrides.color !== undefined ? overrides.color : color,
+          brightness: overrides.brightness !== undefined ? overrides.brightness : brightness,
+          effect: overrides.effect !== undefined ? overrides.effect : effect,
+          effectSpeed: overrides.effectSpeed !== undefined ? overrides.effectSpeed : effectSpeed,
+          effectDirection: overrides.effectDirection !== undefined ? overrides.effectDirection : effectDirection,
+          effectSmoothness: overrides.effectSmoothness !== undefined ? overrides.effectSmoothness : effectSmoothness,
+        };
+      }
+      return p;
     });
-  }, [color, brightness, startWithWindows, startHidden, favoriteColors, theme]);
+
+    await window.electronAPI.saveSettings({
+      startWithWindows,
+      startHidden,
+      favoriteColors,
+      theme,
+      profiles: updatedProfiles,
+      activeProfileId: currentActiveId,
+      // For backwards compatibility
+      color: overrides.color !== undefined ? overrides.color : color,
+      brightness: overrides.brightness !== undefined ? overrides.brightness : brightness,
+      effect: overrides.effect !== undefined ? overrides.effect : effect,
+      effectSpeed: overrides.effectSpeed !== undefined ? overrides.effectSpeed : effectSpeed,
+      effectDirection: overrides.effectDirection !== undefined ? overrides.effectDirection : effectDirection,
+      effectSmoothness: overrides.effectSmoothness !== undefined ? overrides.effectSmoothness : effectSmoothness,
+    });
+  }, [color, brightness, startWithWindows, startHidden, favoriteColors, theme, effect, effectSpeed, effectDirection, effectSmoothness, profiles, activeProfileId]);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -78,6 +157,7 @@ function App() {
 
   const isFav = favoriteColors.includes(color.toLowerCase());
 
+  // Device scanning
   const fetchDevices = useCallback(async () => {
     if (!window.electronAPI) { setStatus('error'); setError('Electron API não disponível'); return; }
     setStatus('scanning');
@@ -87,7 +167,7 @@ function App() {
     else if (Array.isArray(result)) {
       setDevices(result);
       if (result.length > 0) { setActiveDevice(result[0]); setStatus('connected'); }
-      else { setStatus('error'); setError('Nenhum dispositivo RGB detectado.\nVerifique se seus fans/placas possuem LEDs RGB.'); }
+      else { setStatus('error'); setError('Nenhum dispositivo RGB detectado.'); }
     }
   }, []);
 
@@ -117,17 +197,160 @@ function App() {
     await fetchDevices();
   };
 
-  const applyColors = async () => {
+  // Apply effect
+  const applyEffect = async () => {
     if (!activeDevice || !window.electronAPI) return;
-    const base = hexToRgb(color);
-    const final = {
-      red: Math.floor(base.red * brightness / 100),
-      green: Math.floor(base.green * brightness / 100),
-      blue: Math.floor(base.blue * brightness / 100),
+    const opts = { effect, color, brightness, speed: effectSpeed, direction: effectDirection, smoothness: effectSmoothness };
+    const result = await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, opts);
+    if (result?.error) { alert('Erro: ' + result.error); return; }
+    await save();
+  };
+
+  // Profiles operations
+  const selectProfile = async (id) => {
+    const p = profiles.find(prof => prof.id === id);
+    if (!p) return;
+
+    setActiveProfileId(id);
+    setColor(p.color);
+    setBrightness(p.brightness);
+    setEffect(p.effect);
+    setEffectSpeed(p.effectSpeed);
+    setEffectDirection(p.effectDirection);
+    setEffectSmoothness(p.effectSmoothness);
+
+    // Auto apply
+    if (activeDevice && window.electronAPI) {
+      await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
+        effect: p.effect, color: p.color, brightness: p.brightness, speed: p.effectSpeed, direction: p.effectDirection, smoothness: p.effectSmoothness
+      });
+    }
+
+    await save({
+      activeProfileId: id, color: p.color, brightness: p.brightness, effect: p.effect, effectSpeed: p.effectSpeed, effectDirection: p.effectDirection, effectSmoothness: p.effectSmoothness
+    });
+  };
+
+  const createNewProfile = async () => {
+    const name = prompt('Nome do novo perfil:');
+    if (!name || !name.trim()) return;
+
+    const newId = 'profile_' + Date.now();
+    const newP = {
+      id: newId,
+      name: name.trim(),
+      color, brightness, effect, effectSpeed, effectDirection, effectSmoothness
     };
-    const result = await window.electronAPI.updateLeds(activeDevice.index, new Array(activeDevice.colors.length).fill(final));
-    if (result.error) alert('Erro: ' + result.error);
-    else await save();
+
+    const updated = [...profiles, newP];
+    setProfiles(updated);
+    setActiveProfileId(newId);
+
+    await save({ profiles: updated, activeProfileId: newId });
+
+    if (activeDevice && window.electronAPI) {
+      await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
+        effect, color, brightness, speed: effectSpeed, direction: effectDirection, smoothness: effectSmoothness
+      });
+    }
+  };
+
+  const duplicateProfile = async (id) => {
+    const target = profiles.find(p => p.id === id);
+    if (!target) return;
+
+    const newId = 'profile_' + Date.now();
+    const copy = {
+      ...target,
+      id: newId,
+      name: `${target.name} (Cópia)`
+    };
+
+    const updated = [...profiles, copy];
+    setProfiles(updated);
+    setActiveProfileId(newId);
+
+    setColor(copy.color);
+    setBrightness(copy.brightness);
+    setEffect(copy.effect);
+    setEffectSpeed(copy.effectSpeed);
+    setEffectDirection(copy.effectDirection);
+    setEffectSmoothness(copy.effectSmoothness);
+
+    await save({
+      profiles: updated, activeProfileId: newId, color: copy.color, brightness: copy.brightness, effect: copy.effect, effectSpeed: copy.effectSpeed, effectDirection: copy.effectDirection, effectSmoothness: copy.effectSmoothness
+    });
+
+    if (activeDevice && window.electronAPI) {
+      await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
+        effect: copy.effect, color: copy.color, brightness: copy.brightness, speed: copy.effectSpeed, direction: copy.effectDirection, smoothness: copy.effectSmoothness
+      });
+    }
+  };
+
+  const deleteProfile = async (id) => {
+    if (profiles.length <= 1) return;
+
+    const updated = profiles.filter(p => p.id !== id);
+    setProfiles(updated);
+
+    if (activeProfileId === id) {
+      const first = updated[0];
+      setActiveProfileId(first.id);
+      setColor(first.color);
+      setBrightness(first.brightness);
+      setEffect(first.effect);
+      setEffectSpeed(first.effectSpeed);
+      setEffectDirection(first.effectDirection);
+      setEffectSmoothness(first.effectSmoothness);
+
+      await save({
+        profiles: updated, activeProfileId: first.id, color: first.color, brightness: first.brightness, effect: first.effect, effectSpeed: first.effectSpeed, effectDirection: first.effectDirection, effectSmoothness: first.effectSmoothness
+      });
+
+      if (activeDevice && window.electronAPI) {
+        await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
+          effect: first.effect, color: first.color, brightness: first.brightness, speed: first.effectSpeed, direction: first.effectDirection, smoothness: first.effectSmoothness
+        });
+      }
+    } else {
+      await save({ profiles: updated });
+    }
+  };
+
+  const handleExportProfile = async (profile) => {
+    if (!window.electronAPI?.exportProfile) return;
+    const res = await window.electronAPI.exportProfile(profile);
+    if (res?.error) alert('Erro ao exportar: ' + res.error);
+  };
+
+  const handleImportProfile = async () => {
+    if (!window.electronAPI?.importProfile) return;
+    const res = await window.electronAPI.importProfile();
+    if (res?.error) { alert(res.error); return; }
+    if (res?.profile) {
+      const newP = res.profile;
+      const updated = [...profiles, newP];
+      setProfiles(updated);
+      setActiveProfileId(newP.id);
+
+      setColor(newP.color);
+      setBrightness(newP.brightness);
+      setEffect(newP.effect);
+      setEffectSpeed(newP.effectSpeed);
+      setEffectDirection(newP.effectDirection);
+      setEffectSmoothness(newP.effectSmoothness);
+
+      await save({
+        profiles: updated, activeProfileId: newP.id, color: newP.color, brightness: newP.brightness, effect: newP.effect, effectSpeed: newP.effectSpeed, effectDirection: newP.effectDirection, effectSmoothness: newP.effectSmoothness
+      });
+
+      if (activeDevice && window.electronAPI) {
+        await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
+          effect: newP.effect, color: newP.color, brightness: newP.brightness, speed: newP.effectSpeed, direction: newP.effectDirection, smoothness: newP.effectSmoothness
+        });
+      }
+    }
   };
 
   const icon = (type) => {
@@ -148,12 +371,15 @@ function App() {
   };
 
   const rgb = hexToRgb(color);
+  const isAnimated = ANIMATED_EFFECTS.includes(effect);
+  const showColorPicker = effect !== 'off' && effect !== 'rainbow' && effect !== 'colorcycle';
 
   return (
     <>
       <div className="title-bar">KOSAK FAN RGB</div>
       <div className="app-layout">
         <div className="sidebar">
+          {/* Devices List */}
           <div className="sidebar-label">Dispositivos</div>
           <div className="device-list">
             {status !== 'connected' && statusContent()}
@@ -167,6 +393,28 @@ function App() {
               </div>
             ))}
           </div>
+
+          {/* Profiles System */}
+          <div className="sidebar-label">Perfis</div>
+          <div className="profile-list">
+            {profiles.map(p => (
+              <div key={p.id} className={`profile-item ${activeProfileId === p.id ? 'active' : ''}`} onClick={() => selectProfile(p.id)}>
+                <span className="profile-name">{p.name}</span>
+                <div className="profile-actions">
+                  <button className="profile-action-btn" onClick={(e) => { e.stopPropagation(); duplicateProfile(p.id); }} title="Duplicar"><FaClone size={10} /></button>
+                  <button className="profile-action-btn" onClick={(e) => { e.stopPropagation(); handleExportProfile(p); }} title="Exportar"><FaDownload size={10} /></button>
+                  {profiles.length > 1 && (
+                    <button className="profile-action-btn delete" onClick={(e) => { e.stopPropagation(); deleteProfile(p.id); }} title="Excluir"><FaTrash size={10} /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="profile-global-btns">
+            <button className="btn-small-sidebar" onClick={createNewProfile}>+ Novo Perfil</button>
+            <button className="btn-small-sidebar" onClick={handleImportProfile}><FaUpload size={9} /> Importar</button>
+          </div>
+
           <div className="sidebar-footer">
             <div className="toggle-row">
               <span className="toggle-label">Iniciar com Windows</span>
@@ -192,28 +440,48 @@ function App() {
           {activeDevice ? (
             <>
               <div className="main-scroll">
+                {/* Effects */}
                 <div className="section">
-                  <div className="section-title">Cor</div>
-                  <div className="picker-row">
-                    <HexColorPicker color={color} onChange={setColor} />
-                    <div className="color-details">
-                      <div className="color-swatch" style={{ backgroundColor: color }}>
-                        <span className="color-hex">{color.toUpperCase()}</span>
-                      </div>
-                      <div className="rgb-row">
-                        <div className="rgb-cell"><span className="rgb-cell-label r">R</span><span className="rgb-cell-val">{rgb.red}</span></div>
-                        <div className="rgb-cell"><span className="rgb-cell-label g">G</span><span className="rgb-cell-val">{rgb.green}</span></div>
-                        <div className="rgb-cell"><span className="rgb-cell-label b">B</span><span className="rgb-cell-val">{rgb.blue}</span></div>
-                      </div>
-                      <button className={`btn-fav ${isFav ? 'is-fav' : ''}`} onClick={toggleFavorite}>
-                        {isFav ? <FaStar size={11} /> : <FaRegStar size={11} />}
-                        {isFav ? 'Favoritada' : 'Favoritar'}
+                  <div className="section-title">Efeito</div>
+                  <div className="effects-grid">
+                    {EFFECTS.map(fx => (
+                      <button
+                        key={fx.id}
+                        className={`effect-btn ${effect === fx.id ? 'active' : ''}`}
+                        onClick={() => setEffect(fx.id)}
+                      >
+                        {fx.label}
                       </button>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                {favoriteColors.length > 0 && (
+                {/* Color Picker - hidden for rainbow/colorcycle/off */}
+                {showColorPicker && (
+                  <div className="section">
+                    <div className="section-title">Cor</div>
+                    <div className="picker-row">
+                      <HexColorPicker color={color} onChange={setColor} />
+                      <div className="color-details">
+                        <div className="color-swatch" style={{ backgroundColor: color }}>
+                          <span className="color-hex">{color.toUpperCase()}</span>
+                        </div>
+                        <div className="rgb-row">
+                          <div className="rgb-cell"><span className="rgb-cell-label r">R</span><span className="rgb-cell-val">{rgb.red}</span></div>
+                          <div className="rgb-cell"><span className="rgb-cell-label g">G</span><span className="rgb-cell-val">{rgb.green}</span></div>
+                          <div className="rgb-cell"><span className="rgb-cell-label b">B</span><span className="rgb-cell-val">{rgb.blue}</span></div>
+                        </div>
+                        <button className={`btn-fav ${isFav ? 'is-fav' : ''}`} onClick={toggleFavorite}>
+                          {isFav ? <FaStar size={11} /> : <FaRegStar size={11} />}
+                          {isFav ? 'Favoritada' : 'Favoritar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Favorites */}
+                {favoriteColors.length > 0 && showColorPicker && (
                   <div className="section">
                     <div className="section-title">Favoritas</div>
                     <div className="favorites-grid">
@@ -226,15 +494,54 @@ function App() {
                   </div>
                 )}
 
-                <div className="section">
-                  <div className="section-title">Intensidade</div>
-                  <div className="brightness-row">
-                    <span className="brightness-icon">🔅</span>
-                    <input type="range" min="0" max="100" value={brightness} onChange={e => setBrightness(parseInt(e.target.value))} />
-                    <span className="brightness-icon">🔆</span>
-                    <span className="brightness-val">{brightness}%</span>
+                {/* Effect Settings */}
+                {effect !== 'off' && (
+                  <div className="section">
+                    <div className="section-title">Configurações</div>
+
+                    {/* Brightness - always */}
+                    <div className="config-row">
+                      <span className="config-label">Brilho</span>
+                      <div className="config-slider">
+                        <input type="range" min="0" max="100" value={brightness} onChange={e => setBrightness(parseInt(e.target.value))} />
+                        <span className="config-val">{brightness}%</span>
+                      </div>
+                    </div>
+
+                    {/* Speed - animated only */}
+                    {isAnimated && (
+                      <div className="config-row">
+                        <span className="config-label">Velocidade</span>
+                        <div className="config-slider">
+                          <input type="range" min="0" max="100" value={effectSpeed} onChange={e => setEffectSpeed(parseInt(e.target.value))} />
+                          <span className="config-val">{effectSpeed}%</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Direction - animated only */}
+                    {isAnimated && (
+                      <div className="config-row">
+                        <span className="config-label">Direção</span>
+                        <div className="config-btns">
+                          <button className={`dir-btn ${effectDirection === 0 ? 'active' : ''}`} onClick={() => setEffectDirection(0)}>→</button>
+                          <button className={`dir-btn ${effectDirection === 1 ? 'active' : ''}`} onClick={() => setEffectDirection(1)}>←</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Smoothness - animated only */}
+                    {isAnimated && (
+                      <div className="config-row">
+                        <span className="config-label">Suavidade</span>
+                        <div className="config-slider">
+                          <input type="range" min="0" max="100" value={effectSmoothness} onChange={e => setEffectSmoothness(parseInt(e.target.value))} />
+                          <span className="config-val">{effectSmoothness}%</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="main-footer">
@@ -242,7 +549,7 @@ function App() {
                   {theme === 'dark' ? <FaSun size={11} /> : <FaMoon size={11} />}
                   {theme === 'dark' ? 'Claro' : 'Escuro'}
                 </button>
-                <button className="btn-apply" onClick={applyColors}>Aplicar</button>
+                <button className="btn-apply" onClick={applyEffect}>Aplicar</button>
               </div>
             </>
           ) : (
