@@ -52,6 +52,11 @@ function App() {
   const [effectSmoothness, setEffectSmoothness] = useState(50);
   const [version, setVersion] = useState('');
   const [showCoffeeModal, setShowCoffeeModal] = useState(false);
+  const [colorInputVal, setColorInputVal] = useState('#aa3bff');
+
+  useEffect(() => {
+    setColorInputVal(color.toUpperCase());
+  }, [color]);
 
   // Profiles system states
   const [profiles, setProfiles] = useState([
@@ -396,6 +401,40 @@ function App() {
     if (res?.error) alert('Erro ao exportar: ' + res.error);
   };
 
+  const handleColorInputChange = (e) => {
+    let val = e.target.value;
+    setColorInputVal(val);
+
+    let cleanVal = val.trim();
+    if (cleanVal && !cleanVal.startsWith('#')) {
+      cleanVal = '#' + cleanVal;
+    }
+
+    if (/^#[0-9A-Fa-f]{6}$/.test(cleanVal)) {
+      setColor(cleanVal.toLowerCase());
+    } else if (/^#[0-9A-Fa-f]{3}$/.test(cleanVal)) {
+      const expanded = '#' + cleanVal[1] + cleanVal[1] + cleanVal[2] + cleanVal[2] + cleanVal[3] + cleanVal[3];
+      setColor(expanded.toLowerCase());
+    }
+  };
+
+  const handleColorInputBlur = () => {
+    let cleanVal = colorInputVal.trim();
+    if (cleanVal && !cleanVal.startsWith('#')) {
+      cleanVal = '#' + cleanVal;
+    }
+
+    if (!/^#[0-9A-Fa-f]{6}$/.test(cleanVal) && !/^#[0-9A-Fa-f]{3}$/.test(cleanVal)) {
+      setColorInputVal(color.toUpperCase());
+    } else {
+      const resolvedColor = /^#[0-9A-Fa-f]{3}$/.test(cleanVal)
+        ? '#' + cleanVal[1] + cleanVal[1] + cleanVal[2] + cleanVal[2] + cleanVal[3] + cleanVal[3]
+        : cleanVal;
+      setColor(resolvedColor.toLowerCase());
+      setColorInputVal(resolvedColor.toUpperCase());
+    }
+  };
+
   const icon = (type) => {
     if (!type) return <FaQuestion />;
     const t = String(type).toLowerCase();
@@ -521,7 +560,14 @@ function App() {
                       <HexColorPicker color={color} onChange={setColor} />
                       <div className="color-details">
                         <div className="color-swatch" style={{ backgroundColor: color }}>
-                          <span className="color-hex">{color.toUpperCase()}</span>
+                          <input
+                            type="text"
+                            className="color-hex-input"
+                            value={colorInputVal}
+                            onChange={handleColorInputChange}
+                            onBlur={handleColorInputBlur}
+                            maxLength={7}
+                          />
                         </div>
                         <div className="rgb-row">
                           <div className="rgb-cell"><span className="rgb-cell-label r">R</span><span className="rgb-cell-val">{rgb.red}</span></div>
