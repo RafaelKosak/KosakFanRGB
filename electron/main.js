@@ -246,18 +246,14 @@ async function setDeviceToDirectMode(deviceId) {
   } catch (e) { /* ignore */ }
 }
 
-async function applyStaticColor(deviceId, ledCount, color, brightness, zoneId) {
+async function applyStaticColor(deviceId, ledCount, color, brightness) {
   if (!isConnected || !rgbClient) return;
   const rgb = applyBrightness(hexToRgb(color), brightness);
   const colors = new Array(ledCount).fill(rgb);
-  if (zoneId !== undefined && zoneId !== null) {
-    await rgbClient.updateZoneLeds(deviceId, zoneId, colors);
-  } else {
-    await rgbClient.updateLeds(deviceId, colors);
-  }
+  await rgbClient.updateLeds(deviceId, colors);
 }
 
-function startEffect(deviceId, ledCount, opts, zoneId) {
+function startEffect(deviceId, ledCount, opts) {
   stopEffect();
 
   const { effect, color, brightness, speed, direction, smoothness } = opts;
@@ -269,7 +265,7 @@ function startEffect(deviceId, ledCount, opts, zoneId) {
 
   if (effect === 'static') {
     setDeviceToDirectMode(deviceId).then(() =>
-      applyStaticColor(deviceId, ledCount, color, brightness, zoneId)
+      applyStaticColor(deviceId, ledCount, color, brightness)
     );
     return;
   }
@@ -277,11 +273,7 @@ function startEffect(deviceId, ledCount, opts, zoneId) {
   if (effect === 'off') {
     setDeviceToDirectMode(deviceId).then(async () => {
       const black = new Array(ledCount).fill({ red: 0, green: 0, blue: 0 });
-      if (zoneId !== undefined && zoneId !== null) {
-        await rgbClient.updateZoneLeds(deviceId, zoneId, black);
-      } else {
-        await rgbClient.updateLeds(deviceId, black);
-      }
+      await rgbClient.updateLeds(deviceId, black);
     });
     return;
   }
@@ -294,11 +286,7 @@ function startEffect(deviceId, ledCount, opts, zoneId) {
         const colors = computeFrame(effect, ledCount, effectTick, {
           baseRgb, baseHsl, brightness, direction, smoothness
         });
-        if (zoneId !== undefined && zoneId !== null) {
-          await rgbClient.updateZoneLeds(deviceId, zoneId, colors);
-        } else {
-          await rgbClient.updateLeds(deviceId, colors);
-        }
+        await rgbClient.updateLeds(deviceId, colors);
         effectTick++;
       } catch (e) { /* skip frame */ }
     }, intervalMs);
@@ -402,18 +390,6 @@ async function applySavedSettingsToHardware() {
         effectSmoothness: settings.effectSmoothness ?? 50
       };
 
-    const activeDeviceId = settings.activeDeviceId;
-    let activeIndex = settings.activeDeviceIndex ?? 0;
-    let activeZoneId = null;
-
-    if (activeDeviceId) {
-      const parts = activeDeviceId.split('_');
-      if (parts.length === 2) {
-        activeIndex = parseInt(parts[0]);
-        activeZoneId = parseInt(parts[1]);
-      }
-    }
-
     for (let i = 0; i < controllerCount; i++) {
       let data = await rgbClient.getControllerData(i);
       let didResize = false;
@@ -430,28 +406,16 @@ async function applySavedSettingsToHardware() {
         data = await rgbClient.getControllerData(i);
       }
 
-      if (i === activeIndex) {
-        if (activeZoneId !== null) {
-          const zone = data.zones.find(z => z.id === activeZoneId);
-          const ledsCount = zone ? zone.ledsCount : data.colors.length;
-          startEffect(i, ledsCount, {
-            effect: activeProfile.effect || 'static',
-            color: activeProfile.color || '#aa3bff',
-            brightness: activeProfile.brightness ?? 100,
-            speed: activeProfile.effectSpeed ?? 50,
-            direction: activeProfile.effectDirection ?? 0,
-            smoothness: activeProfile.effectSmoothness ?? 50
-          }, activeZoneId);
-        } else {
-          startEffect(i, data.colors.length, {
-            effect: activeProfile.effect || 'static',
-            color: activeProfile.color || '#aa3bff',
-            brightness: activeProfile.brightness ?? 100,
-            speed: activeProfile.effectSpeed ?? 50,
-            direction: activeProfile.effectDirection ?? 0,
-            smoothness: activeProfile.effectSmoothness ?? 50
-          });
-        }
+      // Apply active profile's effect to first device
+      if (i === 0) {
+        startEffect(i, data.colors.length, {
+          effect: activeProfile.effect || 'static',
+          color: activeProfile.color || '#aa3bff',
+          brightness: activeProfile.brightness ?? 100,
+          speed: activeProfile.effectSpeed ?? 50,
+          direction: activeProfile.effectDirection ?? 0,
+          smoothness: activeProfile.effectSmoothness ?? 50
+        });
       } else {
         await setDeviceToDirectMode(i);
         await applyStaticColor(i, data.colors.length, activeProfile.color || '#aa3bff', activeProfile.brightness ?? 100);
@@ -623,26 +587,11 @@ ipcMain.handle('get-devices', async () => {
         await new Promise(r => setTimeout(r, 500));
         data = await rgbClient.getControllerData(i);
       }
-
-      let ledOffset = 0;
-      for (const zone of data.zones) {
-        if (zone.ledsCount > 0) {
-          const zoneColors = data.colors.slice(ledOffset, ledOffset + zone.ledsCount);
-          const zoneLeds = data.leds.slice(ledOffset, ledOffset + zone.ledsCount);
-          devices.push({
-            index: i,
-            zoneId: zone.id,
-            id: `${i}_${zone.id}`,
-            name: `${data.name} - ${zone.name}`,
-            type: data.type,
-            vendor: data.vendor,
-            description: data.description,
-            colors: zoneColors,
-            leds: zoneLeds,
-          });
-        }
-        ledOffset += zone.ledsCount;
-      }
+      devices.push({
+        index: i, name: data.name, type: data.type,
+        vendor: data.vendor, description: data.description,
+        colors: data.colors, leds: data.leds,
+      });
     }
 
     // Save fetched devices to settings cache
@@ -656,25 +605,21 @@ ipcMain.handle('get-devices', async () => {
   }
 });
 
-ipcMain.handle('update-leds', async (event, deviceId, colors, zoneId) => {
+ipcMain.handle('update-leds', async (event, deviceId, colors) => {
   if (!isConnected || !rgbClient) return { error: 'Não conectado' };
   try {
     await setDeviceToDirectMode(deviceId);
-    if (zoneId !== undefined && zoneId !== null) {
-      await rgbClient.updateZoneLeds(deviceId, zoneId, colors);
-    } else {
-      await rgbClient.updateLeds(deviceId, colors);
-    }
+    await rgbClient.updateLeds(deviceId, colors);
     return { success: true };
   } catch (err) {
     return { error: err.message };
   }
 });
 
-ipcMain.handle('set-effect', async (event, deviceId, ledCount, opts, zoneId) => {
+ipcMain.handle('set-effect', async (event, deviceId, ledCount, opts) => {
   if (!isConnected || !rgbClient) return { error: 'Não conectado' };
   try {
-    startEffect(deviceId, ledCount, opts, zoneId);
+    startEffect(deviceId, ledCount, opts);
     return { success: true };
   } catch (err) {
     return { error: err.message };

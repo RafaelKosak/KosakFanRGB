@@ -40,7 +40,6 @@ function App() {
   const [effectDirection, setEffectDirection] = useState(0);
   const [effectSmoothness, setEffectSmoothness] = useState(50);
   const [version, setVersion] = useState('');
-  const [backendConnected, setBackendConnected] = useState(false);
 
   // Profiles system states
   const [profiles, setProfiles] = useState([
@@ -95,9 +94,7 @@ function App() {
       // Load cached devices if present to prevent startup delay
       if (s.cachedDevices && Array.isArray(s.cachedDevices) && s.cachedDevices.length > 0) {
         setDevices(s.cachedDevices);
-        const activeDev = s.cachedDevices.find(d => d.id === s.activeDeviceId)
-          || s.cachedDevices.find(d => d.index === s.activeDeviceIndex)
-          || s.cachedDevices[0];
+        const activeDev = s.cachedDevices.find(d => d.index === s.activeDeviceIndex) || s.cachedDevices[0];
         setActiveDevice(activeDev);
         setStatus('connected');
       }
@@ -180,10 +177,7 @@ function App() {
   const handleSelectDevice = async (device) => {
     setActiveDevice(device);
     if (window.electronAPI?.saveSettings) {
-      await window.electronAPI.saveSettings({
-        activeDeviceId: device.id,
-        activeDeviceIndex: device.index
-      });
+      await window.electronAPI.saveSettings({ activeDeviceIndex: device.index });
     }
   };
 
@@ -192,7 +186,6 @@ function App() {
     if (!window.electronAPI) { setStatus('error'); setError('Electron API não disponível'); return; }
     setStatus('scanning');
     setError('');
-    setBackendConnected(false);
     const result = await window.electronAPI.getDevices();
     if (result?.error) { setStatus('error'); setError(result.error); }
     else if (Array.isArray(result)) {
@@ -200,13 +193,12 @@ function App() {
       if (result.length > 0) {
         setActiveDevice(prev => {
           if (prev) {
-            const found = result.find(d => d.id === prev.id);
+            const found = result.find(d => d.index === prev.index);
             if (found) return found;
           }
           return result[0];
         });
         setStatus('connected');
-        setBackendConnected(true);
       }
       else { setStatus('error'); setError('Nenhum dispositivo RGB detectado.'); }
     }
@@ -225,13 +217,12 @@ function App() {
             setDevices(r);
             setActiveDevice(prev => {
               if (prev) {
-                const found = r.find(d => d.id === prev.id);
+                const found = r.find(d => d.index === prev.index);
                 if (found) return found;
               }
               return r[0];
             });
             setStatus('connected');
-            setBackendConnected(true);
             return;
           }
           if (Array.isArray(r) && r.length === 0) {
@@ -262,7 +253,6 @@ function App() {
 
   const handleRetry = async () => {
     setStatus('scanning'); setError('');
-    setBackendConnected(false);
     if (window.electronAPI?.retryConnection) await window.electronAPI.retryConnection();
     await fetchDevices();
   };
@@ -271,7 +261,7 @@ function App() {
   const applyEffect = async () => {
     if (!activeDevice || !window.electronAPI) return;
     const opts = { effect, color, brightness, speed: effectSpeed, direction: effectDirection, smoothness: effectSmoothness };
-    const result = await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, opts, activeDevice.zoneId);
+    const result = await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, opts);
     if (result?.error) { alert('Erro: ' + result.error); return; }
     await save();
   };
@@ -293,7 +283,7 @@ function App() {
     if (activeDevice && window.electronAPI) {
       await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
         effect: p.effect, color: p.color, brightness: p.brightness, speed: p.effectSpeed, direction: p.effectDirection, smoothness: p.effectSmoothness
-      }, activeDevice.zoneId);
+      });
     }
 
     await save({
@@ -321,7 +311,7 @@ function App() {
     if (activeDevice && window.electronAPI) {
       await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
         effect, color, brightness, speed: effectSpeed, direction: effectDirection, smoothness: effectSmoothness
-      }, activeDevice.zoneId);
+      });
     }
   };
 
@@ -354,7 +344,7 @@ function App() {
     if (activeDevice && window.electronAPI) {
       await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
         effect: copy.effect, color: copy.color, brightness: copy.brightness, speed: copy.effectSpeed, direction: copy.effectDirection, smoothness: copy.effectSmoothness
-      }, activeDevice.zoneId);
+      });
     }
   };
 
@@ -381,7 +371,7 @@ function App() {
       if (activeDevice && window.electronAPI) {
         await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
           effect: first.effect, color: first.color, brightness: first.brightness, speed: first.effectSpeed, direction: first.effectDirection, smoothness: first.effectSmoothness
-        }, activeDevice.zoneId);
+        });
       }
     } else {
       await save({ profiles: updated });
@@ -418,7 +408,7 @@ function App() {
       if (activeDevice && window.electronAPI) {
         await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
           effect: newP.effect, color: newP.color, brightness: newP.brightness, speed: newP.effectSpeed, direction: newP.effectDirection, smoothness: newP.effectSmoothness
-        }, activeDevice.zoneId);
+        });
       }
     }
   };
@@ -454,7 +444,7 @@ function App() {
           <div className="device-list">
             {status !== 'connected' && statusContent()}
             {devices.map(d => (
-              <div key={d.id} className={`device-item ${activeDevice?.id === d.id ? 'active' : ''}`} onClick={() => handleSelectDevice(d)}>
+              <div key={d.index} className={`device-item ${activeDevice?.index === d.index ? 'active' : ''}`} onClick={() => handleSelectDevice(d)}>
                 <div className="device-icon">{icon(d.type)}</div>
                 <div className="device-info">
                   <h3>{d.name}</h3>
