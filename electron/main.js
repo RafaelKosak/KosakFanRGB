@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { Client } from 'openrgb-sdk';
 import { spawn, execSync, exec } from 'child_process';
 import fs from 'fs';
+import { autoUpdater } from 'electron-updater';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow = null;
@@ -32,6 +33,16 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     createWindow();
     createTray();
+
+    // Check for updates automatically in production
+    if (app.isPackaged) {
+      try {
+        autoUpdater.checkForUpdatesAndNotify();
+      } catch (err) {
+        console.error('Failed to check for updates:', err);
+      }
+    }
+
     killExistingOpenRGB();
 
     const started = await spawnOpenRGB();
