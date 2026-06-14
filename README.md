@@ -7,19 +7,22 @@ Aplicativo desktop desenvolvido em React e Electron para controle e gerenciament
 > 
 > **Planejamento Futuro:** Está prevista a adição de funcionalidades para controle e configuração de **curva de velocidade das ventoinhas**.
 
-O projeto visa fornecer uma alternativa leve e direta aos softwares proprietários de fabricantes, comunicando-se com o hardware através de uma instância local embutida do OpenRGB SDK.
+O projeto fornece uma alternativa leve e direta aos softwares proprietários de fabricantes, comunicando-se com o hardware através de uma instância local embutida do OpenRGB SDK.
 
 ## Funcionalidades
 
-- **Seletor de Cores:** Definição manual de cores via paleta HSL/Hex ou por botões de atalho com cores predefinidas.
-- **Controle de Brilho:** Ajuste de intensidade dos LEDs de 0% a 100%.
-- **Persistência de Estado:** Armazenamento automático da última cor e brilho aplicados, restaurando as configurações nos dispositivos ao inicializar.
+- **Controle de Efeitos**: Modos Estático, Rainbow, Ciclo de Cores, Breathing (Respiração) e Desligado.
+- **Ajustes Finos**: Controle de brilho e velocidade de animação diretamente pela interface.
+- **Suporte a Dispositivos**: Integração com o serviço OpenRGB para controlar fans, coolers, placas-mãe e memórias compatíveis.
+- **Seletor de Cores:** Definição de cores via picker visual, paleta de favoritas e entrada direta por código hexadecimal editável (suporta formatos de 3 e 6 dígitos).
+- **Persistência de Estado:** Armazenamento automático do perfil e configurações aplicadas, restaurando o estado nos dispositivos ao inicializar.
 - **Execução em Segundo Plano:** Minimização para a área de notificação do sistema (System Tray) ao fechar a janela.
-- **Inicialização com o SO:** Opção de iniciar automaticamente junto com o Windows, incluindo suporte a inicialização oculta (direto na bandeja).
+- **Inicialização com o SO:** Inicia automaticamente junto com o Windows sem bloqueios de UAC (via Agendador de Tarefas do Windows), com opção de iniciar minimizado (oculto na bandeja).
+- **Atualizações Automáticas**: Sistema integrado de verificação de novas versões direto pelo GitHub Releases.
 
 ## Instalação e Uso
 
-1. Faça o download da última versão em [Releases](https://github.com/).
+1. Faça o download da última versão em [Releases](https://github.com/RafaelKosak/KosakFanRGB/releases).
 2. Execute o instalador `Kosak_Fan_RGB_Setup_v1.0.0.exe`.
 3. O aplicativo exige privilégios de administrador para acessar os barramentos de hardware (SMBus/LPC) e gerenciar os controladores de LED.
 
@@ -33,8 +36,8 @@ O projeto visa fornecer uma alternativa leve e direta aos softwares proprietári
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/kosak/kosak-fan-rgb.git
-cd kosak-fan-rgb
+git clone https://github.com/RafaelKosak/KosakFanRGB.git
+cd KosakFanRGB
 ```
 
 2. Instale as dependências:
@@ -52,7 +55,7 @@ npm run dev
 npm run build
 ```
 
-O instalador gerado será salvo no diretório `./release/` sob o nome `Kosak_Fan_RGB_Setup_v1.0.0.exe`.
+O instalador gerado será salvo no diretório `./release/`.
 
 ## Licença
 
