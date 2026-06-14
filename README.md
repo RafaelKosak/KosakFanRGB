@@ -23,7 +23,7 @@ O projeto fornece uma alternativa leve e direta aos softwares proprietários de 
 ## Instalação e Uso
 
 1. Faça o download da última versão em [Releases](https://github.com/RafaelKosak/KosakFanRGB/releases).
-2. Execute o instalador `Kosak_Fan_RGB_Setup_v1.0.0.exe`.
+2. Execute o instalador `Kosak_Fan_RGB_Setup_v1.0.1.exe`.
 3. O aplicativo exige privilégios de administrador para acessar os barramentos de hardware (SMBus/LPC) e gerenciar os controladores de LED.
 
 ## Desenvolvimento Local

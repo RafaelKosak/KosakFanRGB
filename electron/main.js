@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Tray, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Tray, dialog, shell, powerMonitor } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from 'openrgb-sdk';
@@ -13,6 +13,20 @@ let openRgbProcess = null;
 let rgbClient = null;
 let isConnected = false;
 let isQuitting = false;
+let isReconnecting = false;
+
+const logPath = 'c:\\Users\\kosak\\Desktop\\Development\\Kosak Fan\\debug-load.log';
+const writeLog = (msg) => {
+  const timeMsg = `[${new Date().toISOString()}] ${msg}\n`;
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'debug-load.log'), timeMsg);
+  } catch (e) {}
+  try {
+    if (fs.existsSync(path.dirname(logPath))) {
+      fs.appendFileSync(logPath, timeMsg);
+    }
+  } catch (e) {}
+};
 
 // Effects engine state
 let effectInterval = null;
@@ -33,6 +47,31 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     createWindow();
     createTray();
+
+    // Verify and synchronize Windows Task Scheduler startup task
+    if (process.platform === 'win32' && app.isPackaged) {
+      try {
+        const settings = loadSettings();
+        if (settings.startWithWindows) {
+          const taskName = 'KosakFanRGB';
+          const appPath = app.getPath('exe');
+          const args = settings.startHidden ? ' --hidden' : '';
+          const cmd = `schtasks /create /tn "${taskName}" /tr "\\"${appPath}\\"${args}" /sc onlogon /rl highest /f`;
+          exec(cmd, { windowsHide: true }, (err) => {
+            if (err) {
+              console.error('Error creating scheduled task, falling back to login settings:', err);
+              app.setLoginItemSettings({
+                openAtLogin: true,
+                path: appPath,
+                args: settings.startHidden ? ['--hidden'] : []
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to sync auto-start task:', err);
+      }
+    }
 
     // Check for updates automatically in production
     if (app.isPackaged) {
@@ -59,6 +98,79 @@ if (!gotTheLock) {
         openrgbStarted: started
       });
     }
+
+    // Handle system suspend/resume to restore RGB settings
+    powerMonitor.on('suspend', () => {
+      writeLog('System suspending. Stopping effects and disconnecting client.');
+
+      stopEffect();
+      if (rgbClient) {
+        try {
+          rgbClient.disconnect();
+        } catch (e) {
+          // ignore
+        }
+        rgbClient = null;
+      }
+      isConnected = false;
+
+      if (mainWindow?.webContents) {
+        mainWindow.webContents.send('init-complete', {
+          connected: false,
+          openrgbStarted: false
+        });
+      }
+    });
+
+    const reinitializeOpenRGB = async (reason) => {
+      if (isReconnecting) return;
+      isReconnecting = true;
+      writeLog(`Reinitializing OpenRGB due to: ${reason}. Current isConnected: ${isConnected}`);
+
+      try {
+        killExistingOpenRGB();
+        const started = await spawnOpenRGB();
+        if (started) {
+          const connected = await connectToOpenRGB();
+          if (connected) {
+            await applySavedSettingsToHardware();
+          }
+        }
+
+        if (mainWindow?.webContents) {
+          mainWindow.webContents.send('init-complete', {
+            connected: isConnected,
+            openrgbStarted: started
+          });
+        }
+      } catch (err) {
+        writeLog(`Error during reinitialization: ${err.message}`);
+      } finally {
+        isReconnecting = false;
+      }
+    };
+
+    powerMonitor.on('resume', () => {
+      reinitializeOpenRGB('resume');
+    });
+
+    powerMonitor.on('unlock-screen', () => {
+      if (!isConnected) {
+        reinitializeOpenRGB('unlock-screen');
+      }
+    });
+
+    // Time-jump detector to handle cases where OS-level resume events are swallowed or unreliable
+    let lastTickTime = Date.now();
+    setInterval(() => {
+      const now = Date.now();
+      const diff = now - lastTickTime;
+      lastTickTime = now;
+      if (diff > 15000) { // If the tick was delayed by more than 15 seconds (expected 5 seconds)
+        writeLog(`Time jump detected: ${diff}ms. Triggering reinitialization.`);
+        reinitializeOpenRGB('time-jump');
+      }
+    }, 5000);
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -387,7 +499,14 @@ async function applySavedSettingsToHardware() {
 
   try {
     const settings = loadSettings();
-    const controllerCount = await rgbClient.getControllerCount();
+    const expectedCount = settings.cachedDevices?.length || 1;
+    let controllerCount = 0;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      controllerCount = await rgbClient.getControllerCount();
+      writeLog(`applySavedSettingsToHardware scan attempt ${attempt + 1}: found ${controllerCount} controllers (expected >= ${expectedCount})`);
+      if (controllerCount >= expectedCount) break;
+      await new Promise(r => setTimeout(r, 2000));
+    }
     
     // Find active profile
     const activeProfile = settings.profiles?.find(p => p.id === settings.activeProfileId)
@@ -433,7 +552,7 @@ async function applySavedSettingsToHardware() {
       }
     }
   } catch (err) {
-    console.error('Error auto-applying settings:', err);
+    writeLog(`Error auto-applying settings: ${err.message}`);
   }
 }
 
