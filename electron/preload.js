@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopEffect: () => ipcRenderer.invoke('stop-effect'),
   exportProfile: (profile) => ipcRenderer.invoke('export-profile', profile),
   importProfile: () => ipcRenderer.invoke('import-profile'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   onInitComplete: (callback) => ipcRenderer.on('init-complete', (event, data) => callback(data)),
   removeAllListeners: () => { ipcRenderer.removeAllListeners('init-complete') }
 })

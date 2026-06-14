@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Tray, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Tray, dialog, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from 'openrgb-sdk';
@@ -691,4 +691,12 @@ ipcMain.handle('retry-connection', async () => {
     return { connected };
   }
   return { connected: false };
+});
+
+ipcMain.handle('open-external', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+  } catch (e) {
+    console.error('Failed to open external link:', e);
+  }
 });

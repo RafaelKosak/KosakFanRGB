@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync, FaStar, FaRegStar, FaSun, FaMoon, FaClone, FaTrash, FaDownload, FaUpload } from 'react-icons/fa';
+import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync, FaStar, FaRegStar, FaSun, FaMoon, FaClone, FaTrash, FaDownload, FaUpload, FaCoffee, FaTimes } from 'react-icons/fa';
 import { HexColorPicker } from 'react-colorful';
 import './index.css';
 
@@ -40,6 +40,8 @@ function App() {
   const [effectDirection, setEffectDirection] = useState(0);
   const [effectSmoothness, setEffectSmoothness] = useState(50);
   const [version, setVersion] = useState('');
+  const [showCoffeeWidget, setShowCoffeeWidget] = useState(!localStorage.getItem('coffee_dismissed'));
+  const [showCoffeeModal, setShowCoffeeModal] = useState(false);
 
   // Profiles system states
   const [profiles, setProfiles] = useState([
@@ -624,6 +626,58 @@ function App() {
           )}
         </div>
       </div>
+
+      {showCoffeeWidget && (
+        <div className="coffee-widget" onClick={() => setShowCoffeeModal(true)}>
+          <FaCoffee />
+          <span>Apoie o Projeto</span>
+          <button 
+            className="coffee-widget-close" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowCoffeeWidget(false);
+              localStorage.setItem('coffee_dismissed', 'true');
+            }}
+            title="Fechar"
+          >
+            <FaTimes />
+          </button>
+        </div>
+      )}
+
+      {showCoffeeModal && (
+        <div className="coffee-modal-overlay" onClick={() => setShowCoffeeModal(false)}>
+          <div className="coffee-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="coffee-modal-close" onClick={() => setShowCoffeeModal(false)} title="Fechar">
+              <FaTimes />
+            </button>
+            <div className="coffee-modal-title">Apoie o Desenvolvedor ☕</div>
+            <div className="coffee-modal-subtitle">Se você gosta do software, considere apoiar para ajudar a manter o projeto ativo!</div>
+            
+            <div className="coffee-modal-columns">
+              <div className="coffee-column">
+                <h3>Doar via Pix (Brasil)</h3>
+                <img src="/pix_qr.png" alt="Pix QR Code" className="pix-qr-img" />
+                <p className="pix-text">Aponte a câmera do seu celular para o QR Code acima para doar via Pix.</p>
+              </div>
+              
+              <div className="coffee-column">
+                <h3>Buy Me a Coffee (Internacional)</h3>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                  <FaCoffee className="coffee-icon-large" />
+                  <p className="pix-text">Contribua com um café pelo site oficial Buy Me A Coffee.</p>
+                </div>
+                <button 
+                  className="coffee-btn-link"
+                  onClick={() => window.electronAPI.openExternal('https://buymeacoffee.com/kosak')}
+                >
+                  Visitar buymeacoffee.com/kosak
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
