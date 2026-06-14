@@ -40,6 +40,7 @@ function App() {
   const [effectDirection, setEffectDirection] = useState(0);
   const [effectSmoothness, setEffectSmoothness] = useState(50);
   const [version, setVersion] = useState('');
+  const [backendConnected, setBackendConnected] = useState(false);
 
   // Profiles system states
   const [profiles, setProfiles] = useState([
@@ -90,6 +91,14 @@ function App() {
       if (s.startHidden !== undefined) setStartHidden(s.startHidden);
       if (Array.isArray(s.favoriteColors)) setFavoriteColors(s.favoriteColors);
       if (s.theme) setTheme(s.theme);
+
+      // Load cached devices if present to prevent startup delay
+      if (s.cachedDevices && Array.isArray(s.cachedDevices) && s.cachedDevices.length > 0) {
+        setDevices(s.cachedDevices);
+        const activeDev = s.cachedDevices.find(d => d.index === s.activeDeviceIndex) || s.cachedDevices[0];
+        setActiveDevice(activeDev);
+        setStatus('connected');
+      }
     };
     load();
   }, []);
@@ -166,16 +175,34 @@ function App() {
 
   const isFav = favoriteColors.includes(color.toLowerCase());
 
+  const handleSelectDevice = async (device) => {
+    setActiveDevice(device);
+    if (window.electronAPI?.saveSettings) {
+      await window.electronAPI.saveSettings({ activeDeviceIndex: device.index });
+    }
+  };
+
   // Device scanning
   const fetchDevices = useCallback(async () => {
     if (!window.electronAPI) { setStatus('error'); setError('Electron API não disponível'); return; }
     setStatus('scanning');
     setError('');
+    setBackendConnected(false);
     const result = await window.electronAPI.getDevices();
     if (result?.error) { setStatus('error'); setError(result.error); }
     else if (Array.isArray(result)) {
       setDevices(result);
-      if (result.length > 0) { setActiveDevice(result[0]); setStatus('connected'); }
+      if (result.length > 0) {
+        setActiveDevice(prev => {
+          if (prev) {
+            const found = result.find(d => d.index === prev.index);
+            if (found) return found;
+          }
+          return result[0];
+        });
+        setStatus('connected');
+        setBackendConnected(true);
+      }
       else { setStatus('error'); setError('Nenhum dispositivo RGB detectado.'); }
     }
   }, []);
@@ -189,19 +216,48 @@ function App() {
           const r = await window.electronAPI.getDevices();
           if (cancelled) return;
           if (r?.error) { await new Promise(x => setTimeout(x, 2000)); continue; }
-          if (Array.isArray(r) && r.length > 0) { setDevices(r); setActiveDevice(r[0]); setStatus('connected'); return; }
-          if (Array.isArray(r) && r.length === 0) { setStatus('error'); setError('Nenhum dispositivo RGB detectado.'); return; }
+          if (Array.isArray(r) && r.length > 0) {
+            setDevices(r);
+            setActiveDevice(prev => {
+              if (prev) {
+                const found = r.find(d => d.index === prev.index);
+                if (found) return found;
+              }
+              return r[0];
+            });
+            setStatus('connected');
+            setBackendConnected(true);
+            return;
+          }
+          if (Array.isArray(r) && r.length === 0) {
+            if (devices.length === 0) {
+              setStatus('error');
+              setError('Nenhum dispositivo RGB detectado.');
+            }
+            return;
+          }
         }
         await new Promise(x => setTimeout(x, 2000));
       }
-      if (!cancelled) { setStatus('error'); setError('Não foi possível conectar ao hardware.\nTente executar como Administrador.'); }
+      if (!cancelled && devices.length === 0) {
+        setStatus('error');
+        setError('Não foi possível conectar ao hardware.\nTente executar como Administrador.');
+      }
     };
-    const t = setTimeout(() => { setStatus('scanning'); tryFetch(); }, 3000);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, []);
+
+    if (devices.length > 0) {
+      tryFetch();
+    } else {
+      const t = setTimeout(() => { setStatus('scanning'); tryFetch(); }, 3000);
+      return () => { cancelled = true; clearTimeout(t); };
+    }
+
+    return () => { cancelled = true; };
+  }, [devices.length]);
 
   const handleRetry = async () => {
     setStatus('scanning'); setError('');
+    setBackendConnected(false);
     if (window.electronAPI?.retryConnection) await window.electronAPI.retryConnection();
     await fetchDevices();
   };
@@ -393,7 +449,7 @@ function App() {
           <div className="device-list">
             {status !== 'connected' && statusContent()}
             {devices.map(d => (
-              <div key={d.index} className={`device-item ${activeDevice?.index === d.index ? 'active' : ''}`} onClick={() => setActiveDevice(d)}>
+              <div key={d.index} className={`device-item ${activeDevice?.index === d.index ? 'active' : ''}`} onClick={() => handleSelectDevice(d)}>
                 <div className="device-icon">{icon(d.type)}</div>
                 <div className="device-info">
                   <h3>{d.name}</h3>

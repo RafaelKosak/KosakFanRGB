@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, Tray, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from 'openrgb-sdk';
-import { spawn, execSync } from 'child_process';
+import { spawn, execSync, exec } from 'child_process';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -110,19 +110,59 @@ const loadSettings = () => {
         effectSmoothness: 50
       }
     ],
-    activeProfileId: 'default'
+    activeProfileId: 'default',
+    cachedDevices: [],
+    activeDeviceIndex: 0
   };
 };
 
-const saveSettings = (settings) => {
+const saveSettings = (newSettings) => {
   try {
     const sPath = getSettingsPath();
-    fs.writeFileSync(sPath, JSON.stringify(settings, null, 2));
-    app.setLoginItemSettings({
-      openAtLogin: !!settings.startWithWindows,
-      path: app.getPath('exe'),
-      args: settings.startHidden ? ['--hidden'] : []
-    });
+    const current = loadSettings();
+    
+    const startWithWindowsChanged = newSettings.startWithWindows !== undefined && newSettings.startWithWindows !== current.startWithWindows;
+    const startHiddenChanged = newSettings.startHidden !== undefined && newSettings.startHidden !== current.startHidden;
+    
+    const merged = { ...current, ...newSettings };
+    fs.writeFileSync(sPath, JSON.stringify(merged, null, 2));
+
+    if (process.platform === 'win32') {
+      if (startWithWindowsChanged || startHiddenChanged) {
+        const taskName = 'KosakFanRGB';
+        if (merged.startWithWindows) {
+          const appPath = app.getPath('exe');
+          const args = merged.startHidden ? ' --hidden' : '';
+          const cmd = `schtasks /create /tn "${taskName}" /tr "\\"${appPath}\\"${args}" /sc onlogon /rl highest /f`;
+          exec(cmd, { windowsHide: true }, (err) => {
+            if (err) {
+              console.error('Error creating scheduled task, falling back to login settings:', err);
+              app.setLoginItemSettings({
+                openAtLogin: true,
+                path: appPath,
+                args: merged.startHidden ? ['--hidden'] : []
+              });
+            }
+          });
+        } else {
+          const cmd = `schtasks /delete /tn "${taskName}" /f`;
+          exec(cmd, { windowsHide: true }, () => {
+            app.setLoginItemSettings({
+              openAtLogin: false,
+              path: app.getPath('exe')
+            });
+          });
+        }
+      }
+    } else {
+      if (startWithWindowsChanged || startHiddenChanged) {
+        app.setLoginItemSettings({
+          openAtLogin: !!merged.startWithWindows,
+          path: app.getPath('exe'),
+          args: merged.startHidden ? ['--hidden'] : []
+        });
+      }
+    }
   } catch (e) {
     console.error('Error saving settings:', e);
   }
@@ -553,6 +593,12 @@ ipcMain.handle('get-devices', async () => {
         colors: data.colors, leds: data.leds,
       });
     }
+
+    // Save fetched devices to settings cache
+    const settings = loadSettings();
+    settings.cachedDevices = devices;
+    saveSettings(settings);
+
     return devices;
   } catch (err) {
     return { error: err.message };
