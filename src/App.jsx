@@ -40,7 +40,6 @@ function App() {
   const [effectDirection, setEffectDirection] = useState(0);
   const [effectSmoothness, setEffectSmoothness] = useState(50);
   const [version, setVersion] = useState('');
-  const [showCoffeeWidget, setShowCoffeeWidget] = useState(!localStorage.getItem('coffee_dismissed'));
   const [showCoffeeModal, setShowCoffeeModal] = useState(false);
 
   // Profiles system states
@@ -559,6 +558,21 @@ function App() {
                   </div>
                 )}
 
+                {/* Apoio */}
+                <div className="section">
+                  <div className="section-title">Apoio</div>
+                  <div className="support-card" onClick={() => setShowCoffeeModal(true)}>
+                    <div className="support-card-content">
+                      <FaCoffee className="support-card-icon" />
+                      <div className="support-card-info">
+                        <h3>Apoie o Desenvolvedor ☕</h3>
+                        <p>Clique para doar via Pix ou pelo Buy Me a Coffee</p>
+                      </div>
+                    </div>
+                    <button className="btn-support-action">Apoiar</button>
+                  </div>
+                </div>
+
                 {/* Effect Settings */}
                 {effect !== 'off' && (
                   <div className="section">
@@ -626,24 +640,6 @@ function App() {
           )}
         </div>
       </div>
-
-      {showCoffeeWidget && (
-        <div className="coffee-widget" onClick={() => setShowCoffeeModal(true)}>
-          <FaCoffee />
-          <span>Apoie o Projeto</span>
-          <button 
-            className="coffee-widget-close" 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowCoffeeWidget(false);
-              localStorage.setItem('coffee_dismissed', 'true');
-            }}
-            title="Fechar"
-          >
-            <FaTimes />
-          </button>
-        </div>
-      )}
 
       {showCoffeeModal && (
         <div className="coffee-modal-overlay" onClick={() => setShowCoffeeModal(false)}>
