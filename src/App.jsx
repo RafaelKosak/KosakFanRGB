@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync, FaStar, FaRegStar, FaSun, FaMoon, FaClone, FaTrash, FaDownload, FaUpload, FaCoffee, FaTimes } from 'react-icons/fa';
+import { FaFan, FaMicrochip, FaMemory, FaQuestion, FaSync, FaStar, FaRegStar, FaSun, FaMoon, FaClone, FaTrash, FaDownload, FaCoffee, FaTimes } from 'react-icons/fa';
 import { HexColorPicker } from 'react-colorful';
 import './index.css';
 
@@ -396,35 +396,6 @@ function App() {
     if (res?.error) alert('Erro ao exportar: ' + res.error);
   };
 
-  const handleImportProfile = async () => {
-    if (!window.electronAPI?.importProfile) return;
-    const res = await window.electronAPI.importProfile();
-    if (res?.error) { alert(res.error); return; }
-    if (res?.profile) {
-      const newP = res.profile;
-      const updated = [...profiles, newP];
-      setProfiles(updated);
-      setActiveProfileId(newP.id);
-
-      setColor(newP.color);
-      setBrightness(newP.brightness);
-      setEffect(newP.effect);
-      setEffectSpeed(newP.effectSpeed);
-      setEffectDirection(newP.effectDirection);
-      setEffectSmoothness(newP.effectSmoothness);
-
-      await save({
-        profiles: updated, activeProfileId: newP.id, color: newP.color, brightness: newP.brightness, effect: newP.effect, effectSpeed: newP.effectSpeed, effectDirection: newP.effectDirection, effectSmoothness: newP.effectSmoothness
-      });
-
-      if (activeDevice && window.electronAPI) {
-        await window.electronAPI.setEffect(activeDevice.index, activeDevice.colors.length, {
-          effect: newP.effect, color: newP.color, brightness: newP.brightness, speed: newP.effectSpeed, direction: newP.effectDirection, smoothness: newP.effectSmoothness
-        });
-      }
-    }
-  };
-
   const icon = (type) => {
     if (!type) return <FaQuestion />;
     const t = String(type).toLowerCase();
@@ -484,7 +455,6 @@ function App() {
           </div>
           <div className="profile-global-btns">
             <button className="btn-small-sidebar" onClick={createNewProfile}>+ Novo Perfil</button>
-            <button className="btn-small-sidebar" onClick={handleImportProfile}><FaUpload size={9} /> Importar</button>
           </div>
 
           {/* Support Card in Sidebar */}
